@@ -40,6 +40,7 @@ int main(int argc, char **argv)
 	fd_set rset, allset;
 	struct timeval tv;
 	int nready, nfds;
+	int bar_x = WIDTH / 2 - BAR_LEN_HALF;
 
 	if (tcgetattr(STDIN_FILENO, &old_termios) == -1) {
 		perror("tcgetattr");
@@ -66,6 +67,7 @@ int main(int argc, char **argv)
 	game_render(screen, WIDTH, HEIGHT);
 
 	while (game_loop) {
+		key = 0;
 		rset = allset;
 		tv.tv_sec = 0;
 		tv.tv_usec = 50000;
@@ -92,10 +94,12 @@ int main(int argc, char **argv)
 		game_handle_square();
 
 		/* Place the bar */
-		for (int i = 0; i < BAR_LEN; ++i) {
-			int x = WIDTH / 2 - BAR_LEN_HALF + i;
-			screen[WIDTH * BAR_Y + x] = BAR[i];
-		}
+		if ((key == 'A' || key == 'a') && bar_x > 1)
+			bar_x = bar_x - 2;
+		else if ((key == 'D' || key == 'd') && bar_x < WIDTH - BAR_LEN  - 1)
+			bar_x = bar_x + 2;
+		for (int i = 0; i < BAR_LEN; ++i)
+			screen[WIDTH * BAR_Y + bar_x + i] = BAR[i];
 
 
 
