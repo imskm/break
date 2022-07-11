@@ -8,26 +8,39 @@
 #define WIDTH 	100
 #define HEIGHT 	40
 
-#define BAR "##########"
+#define BAR_CHAR '#'
 #define SQUARE '@'
 #define SQUARE_X 45
 #define SQUARE_Y 30
 #define BAR_Y 32 /* BAR_X will not be needed, place the bar in center */
-#define BAR_LEN (sizeof(BAR) - 1)
+#define BAR_LEN 10
 #define BAR_LEN_HALF (BAR_LEN / 2)
+
+typedef struct game_square_t {
+	int x;
+	int y;
+	int x_sign;
+	int y_sign;
+	int square; /* square symbol */
+} game_square_t;
+
+typedef struct game_bar_t {
+	int x;
+	int y;
+	int size;
+	int bar_char;
+} game_bar_t;
 
 
 bool game_loop = true;
 char screen[WIDTH * HEIGHT];
-int square_x = SQUARE_X;
-int square_y = SQUARE_Y;
-int x_sign = 1;
-int y_sign = 1;
 
-void restore_terminal(void);
+void game_terminal_init(void);
+void game_terminal_restore(void);
 void game_screen_init(char *screen, int w, int h);
-void game_render(const char *screen, int w, int h);
-void game_handle_square(void);
+void game_screen_render(const char *screen, int w, int h);
+void game_draw_square(game_square_t *square);
+void game_draw_bar(game_bar_t *bar, int key);
 
 struct termios old_termios;
 struct termios new_termios;
@@ -40,31 +53,34 @@ int main(int argc, char **argv)
 	fd_set rset, allset;
 	struct timeval tv;
 	int nready, nfds;
-	int bar_x = WIDTH / 2 - BAR_LEN_HALF;
 
-	if (tcgetattr(STDIN_FILENO, &old_termios) == -1) {
-		perror("tcgetattr");
-		return EXIT_FAILURE;
-	}
+	game_square_t square = {
+		.x=SQUARE_X,
+		.y=SQUARE_Y,
+		.x_sign=1,
+		.y_sign=1,
+		.square=SQUARE,
+	};
 
-	new_termios = old_termios;
-	new_termios.c_lflag &= ~(ICANON | ECHO);
-	if (tcsetattr(STDIN_FILENO, TCSANOW, &new_termios) == -1) {
-		perror("tcssetattr");
-		return EXIT_FAILURE;
-	}
+	game_bar_t bar = {
+		.x=WIDTH / 2 - BAR_LEN_HALF,
+		.y=BAR_Y,
+		.size=BAR_LEN,
+		.bar_char=BAR_CHAR,
+	};
 
-	atexit(restore_terminal);
+	game_terminal_init();
+
+	atexit(game_terminal_restore);
 
 	FD_ZERO(&allset);
 	FD_SET(0, &allset);
 	nfds = 1;
 
-	printf("\033[?25l");
 	game_screen_init(screen, WIDTH, HEIGHT);
 	// Draw square
 	screen[WIDTH * SQUARE_Y + SQUARE_X] = SQUARE;
-	game_render(screen, WIDTH, HEIGHT);
+	game_screen_render(screen, WIDTH, HEIGHT);
 
 	while (game_loop) {
 		key = 0;
@@ -79,7 +95,6 @@ int main(int argc, char **argv)
 			return EXIT_FAILURE;
 		}
 
-
 		/* 1. Read KEY: If there is any input then read it otherwise don't */
 		if (nready == 1) {
 			key = getchar();
@@ -91,20 +106,11 @@ int main(int argc, char **argv)
 		/* 2. Update game */
 		game_screen_init(screen, WIDTH, HEIGHT);
 
-		game_handle_square();
-
-		/* Place the bar */
-		if ((key == 'A' || key == 'a') && bar_x > 1)
-			bar_x = bar_x - 2;
-		else if ((key == 'D' || key == 'd') && bar_x < WIDTH - BAR_LEN  - 1)
-			bar_x = bar_x + 2;
-		for (int i = 0; i < BAR_LEN; ++i)
-			screen[WIDTH * BAR_Y + bar_x + i] = BAR[i];
-
-
+		game_draw_square(&square);
+		game_draw_bar(&bar, key);
 
 		/* 3. Render game */
-		game_render(screen, WIDTH, HEIGHT);
+		game_screen_render(screen, WIDTH, HEIGHT);
 		//exit(EXIT_SUCCESS);
 	}
 
@@ -132,7 +138,7 @@ game_screen_init(char *screen, int w, int h)
 }
 
 void
-game_render(const char *screen, int w, int h)
+game_screen_render(const char *screen, int w, int h)
 {
 	/* Position the cursor at Line 0 and Column 0 to prevent scroll */
 	printf("\033[99A\033[100D");
@@ -141,22 +147,52 @@ game_render(const char *screen, int w, int h)
 }
 
 void
-restore_terminal(void)
+game_terminal_restore(void)
 {
+	/* Show cursor */
 	printf("\033[?25h");
 	tcsetattr(STDIN_FILENO, TCSAFLUSH, &old_termios);
 }
 
 void
-game_handle_square(void)
+game_draw_square(game_square_t *square)
 {
-	if (square_x >= WIDTH)  x_sign = -1;
-	if (square_y >= HEIGHT) y_sign = -1;
-	if (square_x < 1) 		x_sign = 1;
-	if (square_y < 1) 		y_sign = 1;
+	if (square->x >= WIDTH)  square->x_sign = -1;
+	if (square->y >= HEIGHT) square->y_sign = -1;
+	if (square->x < 1) 		 square->x_sign = 1;
+	if (square->y < 1) 		 square->y_sign = 1;
 
-	square_x += 1 * x_sign;
-	square_y += 1 * y_sign;
+	square->x += 1 * square->x_sign;
+	square->y += 1 * square->y_sign;
 
-	screen[WIDTH * square_y + square_x] = SQUARE;
+	screen[WIDTH * square->y + square->x] = square->square;
+}
+
+void
+game_draw_bar(game_bar_t *bar, int key)
+{
+	if ((key == 'A' || key == 'a') && bar->x > 1)
+		bar->x = bar->x - 2;
+	else if ((key == 'D' || key == 'd') && bar->x < WIDTH - bar->size  - 1)
+		bar->x = bar->x + 2;
+	for (int i = 0; i < bar->size; ++i)
+		screen[WIDTH * bar->y + bar->x + i] = bar->bar_char;
+}
+
+void
+game_terminal_init(void)
+{
+	if (tcgetattr(STDIN_FILENO, &old_termios) == -1) {
+		perror("tcgetattr");
+		exit(EXIT_FAILURE);
+	}
+
+	new_termios = old_termios;
+	new_termios.c_lflag &= ~(ICANON | ECHO);
+	if (tcsetattr(STDIN_FILENO, TCSANOW, &new_termios) == -1) {
+		perror("tcssetattr");
+		exit(EXIT_FAILURE);
+	}
+	/* Hid cursor */
+	printf("\033[?25l");
 }
