@@ -16,13 +16,13 @@
 #define BAR_LEN 10
 #define BAR_LEN_HALF (BAR_LEN / 2)
 
-typedef struct game_square_t {
+typedef struct game_ball_t {
 	int x;
 	int y;
 	int x_sign;
 	int y_sign;
-	int square; /* square symbol */
-} game_square_t;
+	int ball; /* ball symbol */
+} game_ball_t;
 
 typedef struct game_bar_t {
 	int x;
@@ -39,7 +39,7 @@ void game_terminal_init(void);
 void game_terminal_restore(void);
 void game_screen_init(char *screen, int w, int h);
 void game_screen_render(const char *screen, int w, int h);
-void game_draw_square(game_square_t *square);
+void game_draw_ball(game_ball_t *ball);
 void game_draw_bar(game_bar_t *bar, int key);
 
 struct termios old_termios;
@@ -54,12 +54,12 @@ int main(int argc, char **argv)
 	struct timeval tv;
 	int nready, nfds;
 
-	game_square_t square = {
+	game_ball_t ball = {
 		.x=SQUARE_X,
 		.y=SQUARE_Y,
 		.x_sign=1,
 		.y_sign=1,
-		.square=SQUARE,
+		.ball=SQUARE,
 	};
 
 	game_bar_t bar = {
@@ -78,7 +78,7 @@ int main(int argc, char **argv)
 	nfds = 1;
 
 	game_screen_init(screen, WIDTH, HEIGHT);
-	// Draw square
+	// Draw ball
 	screen[WIDTH * SQUARE_Y + SQUARE_X] = SQUARE;
 	game_screen_render(screen, WIDTH, HEIGHT);
 
@@ -87,9 +87,7 @@ int main(int argc, char **argv)
 		rset = allset;
 		tv.tv_sec = 0;
 		tv.tv_usec = 50000;
-		// printf("waiting...\n");
 		nready = select(nfds, &rset, NULL, NULL, &tv);
-		// printf("ready %d.\n", nready);
 		if (nready == -1) {
 			perror("select()");
 			return EXIT_FAILURE;
@@ -106,12 +104,11 @@ int main(int argc, char **argv)
 		/* 2. Update game */
 		game_screen_init(screen, WIDTH, HEIGHT);
 
-		game_draw_square(&square);
+		game_draw_ball(&ball);
 		game_draw_bar(&bar, key);
 
 		/* 3. Render game */
 		game_screen_render(screen, WIDTH, HEIGHT);
-		//exit(EXIT_SUCCESS);
 	}
 
 	return 0;
@@ -141,9 +138,11 @@ void
 game_screen_render(const char *screen, int w, int h)
 {
 	/* Position the cursor at Line 0 and Column 0 to prevent scroll */
-	printf("\033[99A\033[100D");
+	printf("\033[2J");
+	printf("\033[1;1H");
 
 	fwrite(screen, w * h, 1, stdout);
+	fflush(stdout);
 }
 
 void
@@ -155,17 +154,17 @@ game_terminal_restore(void)
 }
 
 void
-game_draw_square(game_square_t *square)
+game_draw_ball(game_ball_t *ball)
 {
-	if (square->x >= WIDTH)  square->x_sign = -1;
-	if (square->y >= HEIGHT) square->y_sign = -1;
-	if (square->x < 1) 		 square->x_sign = 1;
-	if (square->y < 1) 		 square->y_sign = 1;
+	if (ball->x >= WIDTH)    ball->x_sign = -1;
+	if (ball->y >= HEIGHT) 	 ball->y_sign = -1;
+	if (ball->x < 1) 		 ball->x_sign = 1;
+	if (ball->y < 1) 		 ball->y_sign = 1;
 
-	square->x += 1 * square->x_sign;
-	square->y += 1 * square->y_sign;
+	ball->x += 1 * ball->x_sign;
+	ball->y += 1 * ball->y_sign;
 
-	screen[WIDTH * square->y + square->x] = square->square;
+	screen[WIDTH * ball->y + ball->x] = ball->ball;
 }
 
 void
