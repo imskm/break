@@ -39,7 +39,7 @@ void game_terminal_init(void);
 void game_terminal_restore(void);
 void game_screen_init(char *screen, int w, int h);
 void game_screen_render(const char *screen, int w, int h);
-void game_draw_ball(game_ball_t *ball);
+void game_draw_ball(game_ball_t *ball, game_bar_t *bar);
 void game_draw_bar(game_bar_t *bar, int key);
 
 struct termios old_termios;
@@ -104,7 +104,7 @@ int main(int argc, char **argv)
 		/* 2. Update game */
 		game_screen_init(screen, WIDTH, HEIGHT);
 
-		game_draw_ball(&ball);
+		game_draw_ball(&ball, &bar);
 		game_draw_bar(&bar, key);
 
 		/* 3. Render game */
@@ -153,12 +153,19 @@ game_terminal_restore(void)
 }
 
 void
-game_draw_ball(game_ball_t *ball)
+game_draw_ball(game_ball_t *ball, game_bar_t *bar)
 {
-	if (ball->x >= WIDTH)    ball->x_sign = -1;
-	if (ball->y >= HEIGHT) 	 ball->y_sign = -1;
-	if (ball->x < 1) 		 ball->x_sign = 1;
-	if (ball->y < 1) 		 ball->y_sign = 1;
+	/* If ball collided with bar then handle it
+	 *  - If ball is on the same line as bar
+	 *  - If ball x lies between bar x0 and x(len-bar) */
+	if (ball->y == bar->y && ball->x >= bar->x && ball->x <= bar->x + bar->size) {
+		ball->y_sign = -1;
+	} else {
+		if (ball->x >= WIDTH)    ball->x_sign = -1;
+		if (ball->y >= HEIGHT) 	 ball->y_sign = -1;
+		if (ball->x < 1) 		 ball->x_sign = 1;
+		if (ball->y < 1) 		 ball->y_sign = 1;
+	}
 
 	ball->x += 1 * ball->x_sign;
 	ball->y += 1 * ball->y_sign;
@@ -169,9 +176,9 @@ game_draw_ball(game_ball_t *ball)
 void
 game_draw_bar(game_bar_t *bar, int key)
 {
-	if ((key == 'A' || key == 'a') && bar->x > 1)
+	if ((key == 'A' || key == 'a' || key == 'h') && bar->x > 1)
 		bar->x = bar->x - 2;
-	else if ((key == 'D' || key == 'd') && bar->x < WIDTH - bar->size  - 1)
+	else if ((key == 'D' || key == 'd' || key == 'l') && bar->x < WIDTH - bar->size  - 1)
 		bar->x = bar->x + 2;
 	for (int i = 0; i < bar->size; ++i)
 		screen[WIDTH * bar->y + bar->x + i] = bar->bar_char;
