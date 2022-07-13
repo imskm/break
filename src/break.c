@@ -138,7 +138,6 @@ void
 game_screen_render(const char *screen, int w, int h)
 {
 	/* Position the cursor at Line 0 and Column 0 to prevent scroll */
-	printf("\033[2J");
 	printf("\033[1;1H");
 
 	fwrite(screen, w * h, 1, stdout);
